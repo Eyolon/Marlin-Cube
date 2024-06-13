@@ -31,7 +31,7 @@
 
 #include "../MarlinCore.h"
 
-//#define DEBUG_TOOL_CHANGE
+#define DEBUG_TOOL_CHANGE
 //#define DEBUG_TOOLCHANGE_FILAMENT_SWAP
 
 #define DEBUG_OUT ENABLED(DEBUG_TOOL_CHANGE)
@@ -49,7 +49,7 @@
   Flags<EXTRUDERS> toolchange_extruder_ready;
 #endif
 
-#if EITHER(MAGNETIC_PARKING_EXTRUDER, TOOL_SENSOR) \
+#if (defined(EVENT_GCODE_TOOLCHANGE_LOCK) && defined(EVENT_GCODE_TOOLCHANGE_UNLOCK)) || EITHER(MAGNETIC_PARKING_EXTRUDER, TOOL_SENSOR) \
   || defined(EVENT_GCODE_TOOLCHANGE_T0) || defined(EVENT_GCODE_TOOLCHANGE_T1) || defined(EVENT_GCODE_AFTER_TOOLCHANGE) \
   || (ENABLED(PARKING_EXTRUDER) && PARKING_EXTRUDER_SOLENOIDS_DELAY > 0)
   #include "../gcode/gcode.h"
@@ -493,7 +493,17 @@ void fast_line_to_current(const AxisEnum fr_axis) { _line_to_current(fr_axis, 0.
       LCD_MESSAGE_F("TC Success");
     #endif // TOOL_SENSOR
   }
+#else
+  inline void switching_toolhead_lock(const bool locked) {
+    if(locked)
+      gcode.process_subcommands_now(F(EVENT_GCODE_TOOLCHANGE_UNLOCK));
+    else
+      gcode.process_subcommands_now(F(EVENT_GCODE_TOOLCHANGE_LOCK));
+  }
 
+  void swt_init() {
+    switching_toolhead_lock(true);
+  }
 #endif // TOOL_SENSOR
 
 #if ENABLED(SWITCHING_TOOLHEAD)
@@ -537,12 +547,13 @@ void fast_line_to_current(const AxisEnum fr_axis) { _line_to_current(fr_axis, 0.
 
     planner.synchronize();
     DEBUG_ECHOLNPGM("(2) Unlock and Place Toolhead");
-    switching_toolhead_lock(false);
-    safe_delay(500);
 
     current_position.y = SWITCHING_TOOLHEAD_Y_POS;
     DEBUG_POS("Move Y SwitchPos", current_position);
     slow_line_to_current(Y_AXIS);
+
+    switching_toolhead_lock(false);
+    safe_delay(500);
 
     // Wait for move to complete, then another 0.2s
     planner.synchronize();
@@ -1095,7 +1106,7 @@ void fast_line_to_current(const AxisEnum fr_axis) { _line_to_current(fr_axis, 0.
  * previous tool out of the way and the new tool into place.
  */
 void tool_change(const uint8_t new_tool, bool no_move/*=false*/) {
-
+    
   if (TERN0(MAGNETIC_SWITCHING_TOOLHEAD, new_tool == active_extruder))
     return;
 
@@ -1122,8 +1133,8 @@ void tool_change(const uint8_t new_tool, bool no_move/*=false*/) {
     // Nothing to do
     UNUSED(new_tool); UNUSED(no_move);
 
-  #elif EXTRUDERS < 2
-
+   #elif EXTRUDERS + (ENABLED(LASER_FEATURE)?1:0) + (ENABLED(SPINDLE_FEATURE)?1:0) < 2
+    
     UNUSED(no_move);
 
     if (new_tool) invalid_extruder_error(new_tool);
@@ -1138,7 +1149,7 @@ void tool_change(const uint8_t new_tool, bool no_move/*=false*/) {
          return invalid_extruder_error(new_tool);
     #endif
 
-    if (new_tool >= EXTRUDERS)
+    if (new_tool >= (EXTRUDERS + (ENABLED(LASER_FEATURE)?1:0) + (ENABLED(SPINDLE_FEATURE)?1:0)) )
       return invalid_extruder_error(new_tool);
 
     if (!no_move && homing_needed()) {

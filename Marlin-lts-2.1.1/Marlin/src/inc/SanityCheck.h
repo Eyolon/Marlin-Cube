@@ -1374,7 +1374,7 @@ static_assert(Y_MAX_LENGTH >= Y_BED_SIZE, "Movement bounds (Y_MIN_POS, Y_MAX_POS
  */
 #if ANY(SWITCHING_TOOLHEAD, MAGNETIC_SWITCHING_TOOLHEAD, ELECTROMAGNETIC_SWITCHING_TOOLHEAD)
   constexpr float thpx[] = SWITCHING_TOOLHEAD_X_POS;
-  static_assert(COUNT(thpx) == EXTRUDERS, "SWITCHING_TOOLHEAD_X_POS must be an array EXTRUDERS long.");
+  static_assert(COUNT(thpx) == (EXTRUDERS + (ENABLED(LASER_FEATURE)?1:0) + (ENABLED(SPINDLE_FEATURE)?1:0)), "SWITCHING_TOOLHEAD_X_POS must be an array EXTRUDERS long or the addition of tools (consider laser and/or spindle)");
 #endif
 
 /**
@@ -1383,8 +1383,8 @@ static_assert(Y_MAX_LENGTH >= Y_BED_SIZE, "Movement bounds (Y_MIN_POS, Y_MAX_POS
 #if ENABLED(SWITCHING_TOOLHEAD)
   #ifndef SWITCHING_TOOLHEAD_SERVO_NR
     #error "SWITCHING_TOOLHEAD requires SWITCHING_TOOLHEAD_SERVO_NR."
-  #elif EXTRUDERS < 2
-    #error "SWITCHING_TOOLHEAD requires at least 2 EXTRUDERS."
+  #elif EXTRUDERS < 2 && (!defined(SPINDLE_FEATURE) && !defined(LASER_FEATURE))
+    #error "SWITCHING_TOOLHEAD requires at least 2 EXTRUDERS or 1 EXTRUDERS and 1 LASER_FEATURE or SPINDLE_FEATURE"
   #elif NUM_SERVOS < (SWITCHING_TOOLHEAD_SERVO_NR - 1)
     #if SWITCHING_TOOLHEAD_SERVO_NR == 0
       #error "A SWITCHING_TOOLHEAD_SERVO_NR of 0 requires NUM_SERVOS >= 1."

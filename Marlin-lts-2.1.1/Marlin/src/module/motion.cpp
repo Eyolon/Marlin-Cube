@@ -1935,13 +1935,25 @@ void prepare_line_to_destination() {
    */
 
   void homeaxis(const AxisEnum axis) {
+    
+    if (AXIS_CHAR(axis) == 'A'){
+      set_axis_is_at_home(axis);
+      sync_plan_position();
+
+      destination[axis] = current_position[axis];
+
+      if (DEBUGGING(LEVELING)) DEBUG_POS("> AFTER set_axis_is_at_home", current_position);
+      DEBUG_ECHOLNPGM("<<< forced homeaxis(", AS_CHAR(AXIS_CHAR(axis)), ")");
+      return;
+    }
+
 
     #if EITHER(MORGAN_SCARA, MP_SCARA)
       // Only Z homing (with probe) is permitted
       if (axis != Z_AXIS) { BUZZ(100, 880); return; }
     #else
       #define _CAN_HOME(A) (axis == _AXIS(A) && ( \
-           ENABLED(A##_SPI_SENSORLESS) \
+          ENABLED(A##_SPI_SENSORLESS) \
         || TERN0(HAS_Z_AXIS, TERN0(HOMING_Z_WITH_PROBE, _AXIS(A) == Z_AXIS)) \
         || TERN0(A##_HOME_TO_MIN, A##_MIN_PIN > -1) \
         || TERN0(A##_HOME_TO_MAX, A##_MAX_PIN > -1) \
@@ -1949,7 +1961,7 @@ void prepare_line_to_destination() {
       #define _ANDCANT(N) && !_CAN_HOME(N)
       if (true MAIN_AXIS_MAP(_ANDCANT)) return;
     #endif
-
+  
     if (DEBUGGING(LEVELING)) DEBUG_ECHOLNPGM(">>> homeaxis(", AS_CHAR(AXIS_CHAR(axis)), ")");
 
     const int axis_home_dir = TERN0(DUAL_X_CARRIAGE, axis == X_AXIS)
